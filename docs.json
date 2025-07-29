@@ -9,18 +9,50 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-  "tabs": [
-    {
-      "tab": "Documentation", 
-      "groups": [
-        {
-          "group": "Getting Started",
-          "pages": ["index"]
-        }
-      ]
-    }
-  ]
-},
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "README",
+              "getting-started",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Implementation",
+            "pages": [
+              "websocket-connection",
+              "flutter-implementation",
+              "troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Documentation",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/authentication-endpoint"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "api-reference/websocket-connection",
+              "api-reference/message-types",
+              "api-reference/audio-format"
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
@@ -35,7 +67,7 @@
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://dashboard.thesavants.ai"
+      "href": "https://app.thesavants.ai"
     }
   },
   "footer": {
