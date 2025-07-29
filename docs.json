@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "The Savants Voice API",
   "colors": {
     "primary": "#3B82F6",
