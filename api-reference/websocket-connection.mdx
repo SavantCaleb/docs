@@ -19,7 +19,7 @@ sequenceDiagram
     Client->>Server: WebSocket Connect
     Server->>Client: Connection Established
     Client->>Server: JWT Token (String)
-    Server->>Client: {"type": "vapi_connected"}
+    Server->>Client: {"type": "savants_connected"}
     
     loop Audio Streaming
         Client->>Server: Audio Data (Binary)
@@ -40,7 +40,7 @@ sequenceDiagram
     Immediately send JWT token as first message (String)
   </Step>
   <Step title="Await Confirmation">
-    Wait for `vapi_connected` message from server
+    Wait for `savants_connected` message from server
   </Step>
   <Step title="Begin Streaming">
     Start sending audio data as binary messages
@@ -242,7 +242,7 @@ No custom subprotocols are required.
           this.ws.onmessage = (event) => {
             if (typeof event.data === 'string') {
               const message = JSON.parse(event.data);
-              if (message.type === 'vapi_connected') {
+              if (message.type === 'savants_connected') {
                 resolve();
               } else if (message.type === 'error') {
                 reject(new Error(message.error.message));
@@ -297,7 +297,7 @@ No custom subprotocols are required.
       void _handleMessage(dynamic message) {
         if (message is String) {
           final data = jsonDecode(message);
-          if (data['type'] == 'vapi_connected') {
+          if (data['type'] == 'savants_connected') {
             _onConnected();
           } else if (data['type'] == 'error') {
             _onError(data['error']);
