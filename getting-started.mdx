@@ -1,0 +1,93 @@
+---
+title: 'Getting Started'
+description: 'Set up your environment for The Savants Voice API'
+---
+
+## Overview
+
+The Savants Real-Time Voice API provides a simple and secure way to add real-time, two-way voice conversations to your Flutter Windows desktop application.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- Flutter development environment set up
+- Windows desktop application (target platform)  
+- Valid API credentials from The Savants
+- Basic understanding of WebSocket connections
+
+## Install Dependencies
+
+Add these packages to your `pubspec.yaml`:
+
+```yaml pubspec.yaml
+dependencies:
+  http: ^1.2.1
+  web_socket_channel: ^2.4.0
+  flutter_sound: ^9.2.13 # For low-latency PCM playback
+  permission_handler: ^11.0.1 # For microphone permissions
+  flutter_dotenv: ^5.1.0 # For environment variables
+```
+
+## Environment Setup
+
+<Warning>
+**Security First**: Never hardcode API credentials in your code. Always use environment variables.
+</Warning>
+
+### 1. Create Environment File
+
+Create a `.env` file in your project root:
+
+```bash .env
+API_BASE_URL=https://your-production-server.com
+DEVICE_API_KEY=YOUR_DEVICE_API_KEY
+DEVICE_ID=YOUR_DEVICE_UUID
+```
+
+### 2. Configure Assets
+
+Add to your `pubspec.yaml`:
+
+```yaml pubspec.yaml
+flutter:
+  assets:
+    - .env
+```
+
+### 3. Load Environment Variables
+
+```dart main.dart
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+  runApp(MyApp());
+}
+```
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="shield-check">
+    Use `.env` files and never commit credentials to version control
+  </Card>
+  <Card title="API Key Protection" icon="key">
+    Store `DEVICE_API_KEY` securely - treat it as a secret credential
+  </Card>
+  <Card title="Local Storage" icon="lock">
+    Use encrypted local storage for desktop applications when needed
+  </Card>
+  <Card title="Git Ignore" icon="git-alt">
+    Always add `.env` to your `.gitignore` file
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Once your environment is configured:
+
+1. [Set up Authentication →](authentication)
+2. [Connect via WebSocket →](websocket-connection)  
+3. [Implement in Flutter →](flutter-implementation)

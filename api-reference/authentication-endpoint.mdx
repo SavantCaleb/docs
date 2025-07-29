@@ -1,0 +1,311 @@
+---
+title: "Authentication Endpoint"
+description: "Detailed specification for JWT token authentication"
+---
+
+## Endpoint
+
+<Card title="POST /api/websocket-voice/token" icon="key">
+  Request a JWT token for WebSocket authentication
+</Card>
+
+## Request
+
+### Headers
+
+```http
+Content-Type: application/json
+Accept: application/json
+```
+
+### Body Parameters
+
+| Parameter  | Type   | Required | Description                       |
+| ---------- | ------ | -------- | --------------------------------- |
+| `apiKey`   | string | ✅        | Your device API key               |
+| `deviceId` | string | ✅        | Unique identifier for your device |
+
+### Request Example
+
+```json
+{
+  "apiKey": "sk_live_1234567890abcdef",
+  "deviceId": "device_uuid_4567890abcdef123"
+}
+```
+
+```bash cURL Example
+curl -X POST https://your-server.com/api/websocket-voice/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "sk_live_1234567890abcdef",
+    "deviceId": "device_uuid_4567890abcdef123"
+  }'
+```
+
+## Response
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+**Headers:**
+
+```http
+Content-Type: application/json
+Cache-Control: no-cache, no-store, must-revalidate
+```
+
+**Body:**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZpY2VfNDU2Nzg5MGFiY2RlZjEyMyIsImV4cCI6MTYzOTk4NzY1NCwiaWF0IjoxNjM5OTg3NTk0fQ.signature"
+}
+```
+
+**Response Schema:**
+
+| Field   | Type   | Description                  |
+| ------- | ------ | ---------------------------- |
+| `token` | string | JWT token valid for 1 minute |
+
+### Error Responses
+
+<Tabs>
+  <Tab title="400 Bad Request">
+    **Cause:** Missing or invalid request parameters
+
+    ```json
+    {
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "Missing required field: apiKey",
+        "details": {
+          "field": "apiKey",
+          "expected": "string"
+        }
+      }
+    }
+    ```
+
+    **Common Issues:**
+
+    - Missing `apiKey` or `deviceId` in request body
+    - Invalid JSON format
+    - Empty string values
+  </Tab>
+  <Tab title="401 Unauthorized">
+    **Authentication Failed:**
+
+    ```json
+    {
+      "error": {
+        "code": "AUTHENTICATION_FAILED",
+        "message": "Invalid API key or device ID"
+      }
+    }
+    ```
+
+    **Device Inactive:**
+
+    ```json
+    {
+      "error": {
+        "code": "DEVICE_INACTIVE",
+        "message": "Device has been deactivated",
+        "details": {
+          "deviceId": "device_uuid_4567890abcdef123",
+          "deactivatedAt": "2024-01-15T10:30:00Z"
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="429 Too Many Requests">
+    **Rate Limit Exceeded:**
+
+    ```json
+    {
+      "error": {
+        "code": "RATE_LIMITED",
+        "message": "Too many requests. Try again later.",
+        "details": {
+          "retryAfter": 60,
+          "limit": 60,
+          "window": "1 minute"
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="500 Server Error">
+    **Configuration Error:**
+
+    ```json
+    {
+      "error": {
+        "code": "CONFIGURATION_ERROR",
+        "message": "Server configuration error. Please try again later."
+      }
+    }
+    ```
+
+    **Internal Server Error:**
+
+    ```json
+    {
+      "error": {
+        "code": "INTERNAL_SERVER_ERROR",
+        "message": "An unexpected error occurred. Please try again later."
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## JWT Token Details
+
+### Token Structure
+
+The returned JWT contains the following claims:
+
+| Claim | Description                              |
+| ----- | ---------------------------------------- |
+| `sub` | Subject - Your device ID                 |
+| `iat` | Issued at timestamp                      |
+| `exp` | Expiration timestamp (iat \+ 60 seconds) |
+| `aud` | Audience - "voice-api"                   |
+| `iss` | Issuer - "thesavants.ai"                 |
+
+### Token Validation
+
+**Example JWT Payload:**
+
+```json
+{
+  "sub": "device_uuid_4567890abcdef123",
+  "iat": 1639987594,
+  "exp": 1639987654,
+  "aud": "voice-api",
+  "iss": "thesavants.ai"
+}
+```
+
+### Security Notes
+
+<Warning>
+  **Token Lifespan**: Tokens expire after exactly 60 seconds and cannot be renewed. Request a new token for each WebSocket connection.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Single Use" icon="clock">
+    Each token should only be used once for one WebSocket connection
+  </Card>
+  <Card title="No Caching" icon="ban">
+    Never cache or store tokens beyond their intended use
+  </Card>
+  <Card title="Secure Transport" icon="shield">
+    Always use HTTPS for token requests
+  </Card>
+  <Card title="Error Handling" icon="exclamation-triangle">
+    Implement exponential backoff for rate limit errors
+  </Card>
+</CardGroup>
+
+## Rate Limiting
+
+- **Limit**: 60 requests per minute per device
+- **Window**: Rolling 60-second window
+- **Reset**: Rate limit resets after 60 seconds from first request
+
+**Rate Limit Headers:**
+
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1639987654
+```
+
+## Implementation Examples
+
+<Tabs>
+  <Tab title="Flutter/Dart">
+    ```dart
+    Future<String> fetchAuthToken() async {
+      final response = await http.post(
+        Uri.parse('${apiBaseUrl}/api/websocket-voice/token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'apiKey': apiKey,
+          'deviceId': deviceId,
+        }),
+      );
+    
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['token'];
+      } else {
+        final error = jsonDecode(response.body);
+        throw AuthenticationException(
+          error['error']['code'],
+          error['error']['message'],
+        );
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    async function fetchAuthToken() {
+      const response = await fetch('/api/websocket-voice/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: process.env.DEVICE_API_KEY,
+          deviceId: process.env.DEVICE_ID,
+        }),
+      });
+    
+      if (response.ok) {
+        const data = await response.json();
+        return data.token;
+      } else {
+        const error = await response.json();
+        throw new Error(`${error.error.code}: ${error.error.message}`);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import requests
+    import json
+    
+    def fetch_auth_token(api_key, device_id, base_url):
+        response = requests.post(
+            f"{base_url}/api/websocket-voice/token",
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            json={
+                "apiKey": api_key,
+                "deviceId": device_id
+            }
+        )
+        
+        if response.status_code == 200:
+            return response.json()["token"]
+        else:
+            error = response.json()
+            raise Exception(f"{error['error']['code']}: {error['error']['message']}")
+    ```
+  </Tab>
+</Tabs>

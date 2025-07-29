@@ -1,0 +1,238 @@
+---
+title: 'Troubleshooting'
+description: 'Common issues and solutions'
+---
+
+## Authentication Issues
+
+<Accordion title="Authentication Failed Error">
+  **Problem:** Receiving 401 error when requesting token
+
+  **Solutions:**
+  - Verify your `DEVICE_API_KEY` is correct
+  - Ensure your `DEVICE_ID` matches the registered device
+  - Check that your device hasn't been deactivated
+  - Confirm you're using the correct API endpoint URL
+
+  **Debug Steps:**
+  ```dart
+  print('API Base URL: ${dotenv.env['API_BASE_URL']}');
+  print('Device ID: ${dotenv.env['DEVICE_ID']}');
+  // Never print the API key in production!
+  ```
+</Accordion>
+
+<Accordion title="Token Expired Error">
+  **Problem:** WebSocket connection fails with expired token
+
+  **Solutions:**
+  - Tokens expire after 1 minute - don't cache them
+  - Request a new token for each connection attempt
+  - Implement automatic retry with new token
+
+  **Example Retry Logic:**
+  ```dart
+  Future<void> _retryWithNewToken() async {
+    try {
+      final newToken = await _fetchAuthToken();
+      await _connectWebSocket(newToken);
+    } catch (e) {
+      _updateState(VoiceStatus.error, "Retry failed: $e");
+    }
+  }
+  ```
+</Accordion>
+
+## WebSocket Connection Issues
+
+<Accordion title="Connection Fails to Establish">
+  **Possible Causes & Solutions:**
+
+  1. **Incorrect WebSocket URL**
+     - Ensure you're converting HTTP to WS: `http://` → `ws://`, `https://` → `wss://`
+     - Verify the `/voice-stream` endpoint path
+
+  2. **Network/Firewall Issues**
+     - Check if your network allows WebSocket connections
+     - Try connecting from a different network
+
+  3. **Server Not Running**
+     - Verify your server is running and accessible
+     - Test with a simple HTTP request first
+</Accordion>
+
+<Accordion title="Connection Drops Unexpectedly">
+  **Problem:** WebSocket disconnects during conversation
+
+  **Solutions:**
+  - Implement reconnection logic with exponential backoff
+  - Add connection heartbeat/ping mechanism
+  - Check network stability
+
+  **Example Reconnection Logic:**
+  ```dart
+  int _reconnectAttempts = 0;
+  static const int maxReconnectAttempts = 3;
+
+  Future<void> _attemptReconnection() async {
+    if (_reconnectAttempts < maxReconnectAttempts) {
+      _reconnectAttempts++;
+      final delay = Duration(seconds: math.pow(2, _reconnectAttempts).toInt());
+      
+      await Future.delayed(delay);
+      
+      try {
+        await startConversation();
+        _reconnectAttempts = 0; // Reset on success
+      } catch (e) {
+        _attemptReconnection();
+      }
+    }
+  }
+  ```
+</Accordion>
+
+## Audio Issues
+
+<Accordion title="No Audio Being Transmitted">
+  **Troubleshooting Steps:**
+
+  1. **Check Microphone Permission**
+     ```dart
+     final status = await Permission.microphone.status;
+     print('Microphone permission: $status');
+     ```
+
+  2. **Verify Audio Format**
+     - Must be: 16kHz, 16-bit, mono PCM
+     - Check recorder configuration:
+     ```dart
+     await _audioRecorder.startRecorder(
+       codec: Codec.pcm16,    // Correct
+       sampleRate: 16000,     // Correct
+       numChannels: 1,        // Correct - Mono
+     );
+     ```
+
+  3. **Test Audio Recording**
+     ```dart
+     _recorderSubscription = stream?.listen((buffer) {
+       print('Audio buffer size: ${buffer?.length}');
+       if (_channel?.closeCode == null && buffer != null) {
+         _channel?.sink.add(buffer);
+       }
+     });
+     ```
+</Accordion>
+
+<Accordion title="Audio Quality Issues (Static/Distortion)">
+  **Common Causes & Solutions:**
+
+  1. **Incorrect Audio Format**
+     - **Must use**: 16-bit PCM, 16,000 Hz, Mono
+     - **Not**: 8-bit, different sample rates, or stereo
+
+  2. **Buffer Size Issues**
+     - Try adjusting audio buffer sizes
+     - Ensure consistent streaming
+
+  3. **Network Issues**
+     - Check for packet loss
+     - Verify stable internet connection
+</Accordion>
+
+## Flutter-Specific Issues
+
+<Accordion title="flutter_sound Package Issues">
+  **Solutions:**
+
+  1. **Update Dependencies**
+     ```yaml
+     flutter_sound: ^9.2.13  # Use latest version
+     ```
+
+  2. **Platform-Specific Setup**
+     For Windows, ensure you have proper audio drivers and permissions.
+
+  3. **Alternative Audio Package**
+     If `flutter_sound` doesn't work, try:
+     ```yaml
+     dependencies:
+       just_audio: ^0.9.34
+       audio_session: ^0.1.16
+     ```
+</Accordion>
+
+<Accordion title="Environment Variables Not Loading">
+  **Solutions:**
+
+  1. **Check File Location**
+     - `.env` file must be in project root
+     - Same directory as `pubspec.yaml`
+
+  2. **Verify `pubspec.yaml` Configuration**
+     ```yaml
+     flutter:
+       assets:
+         - .env
+     ```
+
+  3. **Load Environment Early**
+     ```dart
+     void main() async {
+       WidgetsFlutterBinding.ensureInitialized();
+       await dotenv.load(fileName: ".env");
+       runApp(MyApp());
+     }
+     ```
+</Accordion>
+
+## Debug Logging
+
+Enable comprehensive logging to troubleshoot issues:
+
+```dart
+class VoiceService {
+  static const bool debugMode = true; // Set to false in production
+  
+  void _log(String message) {
+    if (debugMode) {
+      print('[VoiceService] $message');
+    }
+  }
+  
+  Future<void> startConversation() async {
+    _log('Starting conversation...');
+    try {
+      _log('Fetching auth token...');
+      final token = await _fetchAuthToken();
+      _log('Token received, connecting WebSocket...');
+      await _connectWebSocket(token);
+    } catch (e) {
+      _log('Error: $e');
+      rethrow;
+    }
+  }
+}
+```
+
+## Common Error Codes
+
+| Error Code | Description | Solution |
+|------------|-------------|----------|
+| `INVALID_REQUEST` | Missing required parameters | Check request format |
+| `AUTHENTICATION_FAILED` | Invalid credentials | Verify API key and device ID |
+| `DEVICE_INACTIVE` | Device deactivated | Contact support |
+| `TOKEN_EXPIRED` | JWT token expired | Request new token |
+| `INVALID_AUDIO_FORMAT` | Wrong audio format | Use 16kHz, 16-bit, mono PCM |
+| `CONNECTION_TIMEOUT` | WebSocket timeout | Check network connectivity |
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. **Check Error Messages**: Look for specific error codes and messages
+2. **Test Network Connectivity**: Ensure your server is accessible
+3. **Verify Credentials**: Double-check API keys and device IDs
+4. **Update Dependencies**: Ensure you're using compatible package versions
+5. **Contact Support**: Reach out at [support@thesavants.ai](mailto:support@thesavants.ai)

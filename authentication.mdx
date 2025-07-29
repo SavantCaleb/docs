@@ -1,0 +1,112 @@
+---
+title: 'Authentication'
+description: 'Learn how to authenticate with JWT tokens'
+---
+
+## Overview
+
+All WebSocket connections must be authenticated using a JSON Web Token (JWT) for security.
+
+## Token Request
+
+<Card title="Authentication Endpoint" icon="key">
+  **POST** `/api/websocket-voice/token`
+</Card>
+
+### Request Format
+
+```json Request Body
+{
+  "apiKey": "YOUR_DEVICE_API_KEY",
+  "deviceId": "YOUR_DEVICE_UUID"
+}
+```
+
+### Headers
+
+```http
+Content-Type: application/json
+```
+
+## Responses
+
+<Tabs>
+  <Tab title="Success">
+    **Status:** `200 OK`
+    
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    ```
+    
+    <Note>
+      The JWT token is **short-lived (1 minute)** and must be used immediately.
+    </Note>
+  </Tab>
+  
+  <Tab title="Errors">
+    | Status | Error Code | Description | Action |
+    |--------|------------|-------------|---------|
+    | `400` | `INVALID_REQUEST` | Missing parameters | Check request format |
+    | `401` | `AUTHENTICATION_FAILED` | Invalid credentials | Verify API key/device ID |
+    | `401` | `DEVICE_INACTIVE` | Device deactivated | Contact support |
+    | `500` | `CONFIGURATION_ERROR` | Server issue | Retry later |
+    | `500` | `INTERNAL_SERVER_ERROR` | General error | Retry later |
+  </Tab>
+</Tabs>
+
+## Implementation
+
+```dart authentication.dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+Future<String> fetchAuthToken() async {
+  final response = await http.post(
+    Uri.parse('${dotenv.env['API_BASE_URL']}/api/websocket-voice/token'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'apiKey': dotenv.env['DEVICE_API_KEY'],
+      'deviceId': dotenv.env['DEVICE_ID'],
+    }),
+  );
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    return data['token'];
+  } else {
+    final errorData = jsonDecode(response.body);
+    throw Exception('Authentication failed: ${errorData['message']}');
+  }
+}
+```
+
+## Important Notes
+
+<Warning>
+**Token Expiration**: Tokens expire after 1 minute. Request a new token for each WebSocket connection.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="No Caching" icon="clock">
+    Never store or cache tokens - they're single-use
+  </Card>
+  <Card title="Error Handling" icon="exclamation-triangle">
+    Always handle authentication errors gracefully
+  </Card>
+  <Card title="Fresh Tokens" icon="refresh">
+    Request new token for each connection attempt
+  </Card>
+  <Card title="Immediate Use" icon="bolt">
+    Use tokens immediately after receiving them
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+With authentication working:
+
+1. [Connect via WebSocket →](websocket-connection)
+2. [See complete implementation →](flutter-implementation)

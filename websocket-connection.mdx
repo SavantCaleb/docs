@@ -1,0 +1,118 @@
+---
+title: 'WebSocket Connection'
+description: 'Establish real-time audio streaming connections'
+---
+
+## Connection Details
+
+<Card title="WebSocket Endpoint" icon="plug">
+  **URL:** `wss://your-server-url/voice-stream`
+</Card>
+
+## Audio Format Requirements
+
+<CardGroup cols={2}>
+  <Card title="Sending (Mic → Server)" icon="microphone">
+    Raw PCM, 16,000 Hz, 16-bit Signed Little-Endian, Mono
+  </Card>
+  <Card title="Receiving (Server → Client)" icon="volume-high">
+    Same format - PCM audio from the AI
+  </Card>
+</CardGroup>
+
+## Connection Flow
+
+<Steps>
+  <Step title="Open WebSocket">
+    Connect to the WebSocket endpoint URL
+  </Step>
+  <Step title="Send Token">
+    Immediately send your JWT token as a text message
+  </Step>
+  <Step title="Wait for Confirmation">
+    Server sends `vapi_connected` when ready
+  </Step>
+  <Step title="Start Streaming">
+    Begin bidirectional audio streaming
+  </Step>
+</Steps>
+
+## Message Types
+
+### Server → Client
+
+**Connection Confirmed:**
+```json
+{
+  "type": "vapi_connected",
+  "message": "Connection established"
+}
+```
+
+**Error Message:**
+```json
+{
+  "type": "error",
+  "error": {
+    "message": "Error description",
+    "code": "ERROR_CODE"
+  }
+}
+```
+
+**Audio Data:** Binary data containing PCM audio from AI
+
+### Client → Server
+
+- **Token:** String containing JWT
+- **Audio:** Binary PCM data from microphone
+
+## Implementation Example
+
+```dart websocket_connection.dart
+class WebSocketManager {
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
+
+  Future<void> connect(String token) async {
+    // 1. Connect to WebSocket
+    final wsUrl = '${dotenv.env['API_BASE_URL']}'
+        .replaceFirst(RegExp(r'^http'), 'ws') + '/voice-stream';
+    _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+    // 2. Listen for messages
+    _subscription = _channel!.stream.listen(
+      _handleMessage,
+      onError: _handleError,
+      onDone: _handleDisconnection,
+    );
+
+    // 3. Send authentication token
+    _channel!.sink.add(token);
+  }
+
+  void _handleMessage(dynamic message) {
+    if (message is String) {
+      final data = jsonDecode(message);
+      if (data['type'] == 'vapi_connected') {
+        // Start audio streaming
+        _startAudioStreaming();
+      }
+    } else if (message is List<int>) {
+      // Handle incoming audio
+      _playAudioChunk(Uint8List.fromList(message));
+    }
+  }
+}
+```
+
+## Error Handling
+
+<Warning>
+Always implement proper error handling for connection issues, authentication failures, and unexpected disconnections.
+</Warning>
+
+## Next Steps
+
+- [Complete Flutter Implementation →](flutter-implementation)
+- [Troubleshooting Guide →](troubleshooting)

@@ -1,0 +1,291 @@
+---
+title: 'Flutter Implementation'
+description: 'Complete Flutter/Dart code example'
+---
+
+## Complete Voice Service
+
+Here's a production-ready Flutter implementation:
+
+```dart voice_service.dart
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+enum VoiceStatus { 
+  disconnected, 
+  connecting, 
+  authenticating, 
+  streaming, 
+  error 
+}
+
+class VoiceState {
+  final VoiceStatus status;
+  final String message;
+  VoiceState(this.status, this.message);
+}
+
+class VoiceService {
+  final String apiBaseUrl;
+  final String apiKey;
+  final String deviceId;
+
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _channelSubscription;
+  final FlutterSoundPlayer _audioPlayer = FlutterSoundPlayer();
+  final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
+  StreamSubscription? _recorderSubscription;
+
+  final StreamController<VoiceState> _stateController = 
+      StreamController<VoiceState>.broadcast();
+  Stream<VoiceState> get stateStream => _stateController.stream;
+
+  VoiceService({
+    required this.apiBaseUrl,
+    required this.apiKey,
+    required this.deviceId,
+  });
+
+  Future<void> startConversation() async {
+    try {
+      _updateState(VoiceStatus.authenticating, "Getting token...");
+      final token = await _fetchAuthToken();
+      
+      _updateState(VoiceStatus.connecting, "Connecting...");
+      await _connectWebSocket(token);
+    } catch (e) {
+      _updateState(VoiceStatus.error, "Failed: $e");
+    }
+  }
+
+  Future<String> _fetchAuthToken() async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/api/websocket-voice/token'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'apiKey': apiKey, 'deviceId': deviceId}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body)['token'];
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception('Auth failed: ${errorData['message']}');
+    }
+  }
+
+  Future<void> _connectWebSocket(String token) async {
+    final wsUrl = apiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws') + '/voice-stream';
+    _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+    _channelSubscription = _channel!.stream.listen(
+      _handleMessage,
+      onDone: _handleDisconnection,
+      onError: (error) {
+        _updateState(VoiceStatus.error, "Connection error");
+        stopConversation();
+      },
+    );
+
+    _channel!.sink.add(token);
+  }
+
+  void _handleMessage(dynamic message) {
+    if (message is String) {
+      final data = jsonDecode(message);
+      if (data['type'] == 'vapi_connected') {
+        _startAudioStreaming();
+      } else if (data['type'] == 'error') {
+        _updateState(VoiceStatus.error, "Error: ${data['error']['message']}");
+      }
+    } else if (message is List<int>) {
+      _playAudioChunk(Uint8List.fromList(message));
+    }
+  }
+
+  Future<void> _startAudioStreaming() async {
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      _updateState(VoiceStatus.error, "Microphone permission denied");
+      return;
+    }
+
+    await _audioPlayer.openPlayer();
+    await _audioRecorder.openRecorder();
+    _updateState(VoiceStatus.streaming, "Streaming...");
+    
+    final stream = await _audioRecorder.startRecorder(
+      codec: Codec.pcm16,
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+
+    _recorderSubscription = stream?.listen((buffer) {
+      if (_channel?.closeCode == null && buffer != null) {
+        _channel?.sink.add(buffer);
+      }
+    });
+  }
+
+  Future<void> _playAudioChunk(Uint8List pcmData) async {
+    if (_audioPlayer.isStopped) {
+      await _audioPlayer.startPlayerFromStream(
+        codec: Codec.pcm16,
+        numChannels: 1,
+        sampleRate: 16000,
+      );
+    }
+    await _audioPlayer.feedFromStream(pcmData);
+  }
+  
+  Future<void> stopConversation() async {
+    _updateState(VoiceStatus.disconnected, "Disconnected");
+    await _recorderSubscription?.cancel();
+    if (_audioRecorder.isRecording) await _audioRecorder.stopRecorder();
+    if (_audioPlayer.isPlaying) await _audioPlayer.stopPlayer();
+    await _audioRecorder.closeRecorder();
+    await _audioPlayer.closePlayer();
+    _channel?.sink.close();
+    _channelSubscription?.cancel();
+  }
+
+  void _handleDisconnection() {
+    _updateState(VoiceStatus.disconnected, "Connection closed");
+    stopConversation();
+  }
+
+  void _updateState(VoiceStatus status, String message) {
+    _stateController.add(VoiceState(status, message));
+  }
+
+  void dispose() {
+    stopConversation();
+    _stateController.close();
+  }
+}
+```
+
+## Usage Example
+
+```dart voice_page.dart
+class VoiceConversationPage extends StatefulWidget {
+  @override
+  _VoiceConversationPageState createState() => _VoiceConversationPageState();
+}
+
+class _VoiceConversationPageState extends State<VoiceConversationPage> {
+  late VoiceService _voiceService;
+  StreamSubscription<VoiceState>? _stateSubscription;
+  VoiceState _currentState = VoiceState(VoiceStatus.disconnected, "Ready");
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _voiceService = VoiceService(
+      apiBaseUrl: dotenv.env['API_BASE_URL']!,
+      apiKey: dotenv.env['DEVICE_API_KEY']!,
+      deviceId: dotenv.env['DEVICE_ID']!,
+    );
+
+    _stateSubscription = _voiceService.stateStream.listen((state) {
+      setState(() => _currentState = state);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Voice Conversation')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(_getStatusIcon(), size: 64, color: _getStatusColor()),
+            SizedBox(height: 16),
+            Text(_currentState.status.toString().split('.').last.toUpperCase()),
+            Text(_currentState.message),
+            SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: _getButtonAction(),
+              child: Text(_getButtonText()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getStatusIcon() {
+    switch (_currentState.status) {
+      case VoiceStatus.disconnected: return Icons.mic_off;
+      case VoiceStatus.streaming: return Icons.mic;
+      default: return Icons.hourglass_empty;
+    }
+  }
+
+  Color _getStatusColor() {
+    switch (_currentState.status) {
+      case VoiceStatus.disconnected: return Colors.grey;
+      case VoiceStatus.streaming: return Colors.green;
+      case VoiceStatus.error: return Colors.red;
+      default: return Colors.orange;
+    }
+  }
+
+  String _getButtonText() {
+    switch (_currentState.status) {
+      case VoiceStatus.disconnected: return 'Start Conversation';
+      case VoiceStatus.streaming: return 'End Conversation';
+      case VoiceStatus.error: return 'Retry';
+      default: return 'Connecting...';
+    }
+  }
+
+  VoidCallback? _getButtonAction() {
+    switch (_currentState.status) {
+      case VoiceStatus.disconnected:
+      case VoiceStatus.error:
+        return () => _voiceService.startConversation();
+      case VoiceStatus.streaming:
+        return () => _voiceService.stopConversation();
+      default:
+        return null; // Disable button while connecting
+    }
+  }
+
+  @override
+  void dispose() {
+    _stateSubscription?.cancel();
+    _voiceService.dispose();
+    super.dispose();
+  }
+}
+```
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="State Management" icon="chart-line">
+    Broadcast stream for UI state updates
+  </Card>
+  <Card title="Error Handling" icon="shield-check">
+    Comprehensive error handling at every step
+  </Card>
+  <Card title="Resource Management" icon="recycle">
+    Proper cleanup of audio and WebSocket resources
+  </Card>
+  <Card title="Permissions" icon="key">
+    Microphone permission handling
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- [Troubleshoot issues →](troubleshooting)
+- [API Reference →](api-reference/overview)
