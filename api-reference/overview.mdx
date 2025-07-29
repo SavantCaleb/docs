@@ -7,17 +7,30 @@ description: 'Technical overview of The Savants Voice API'
 
 The Savants Voice API enables real-time, bidirectional voice conversations between your application and AI. The API uses a hybrid approach combining HTTP for authentication and WebSockets for real-time audio streaming.
 
-```markdown
 ## Architecture
 
-```mermaid
-graph TD
-    A[Flutter App] -->|1. POST /api/websocket-voice/token| B[Auth Server]
-    B -->|2. JWT Token| A
-    A -->|3. Connect + Token| C[WebSocket Server]
-    C -->|4. vapi_connected| A
-    A <-->|5. Audio Streaming| C
+The API follows a simple two-step process:
+
+**Step 1: Authentication**
 ```
+Flutter App  →  [POST /api/websocket-voice/token]  →  Auth Server
+Flutter App  ←  [JWT Token Response]  ←  Auth Server
+```
+
+**Step 2: Real-time Communication**
+```
+Flutter App  →  [WebSocket Connect + JWT]  →  WebSocket Server
+Flutter App  ←  [vapi_connected confirmation]  ←  WebSocket Server
+Flutter App  ↔  [Bidirectional Audio Stream]  ↔  WebSocket Server
+```
+
+### Flow Description
+
+1. **Authentication Request**: Flutter app sends API key and device ID to get JWT token
+2. **Token Response**: Server returns short-lived JWT token (1 minute expiry)
+3. **WebSocket Connection**: App connects to WebSocket endpoint with JWT token
+4. **Connection Confirmation**: Server confirms with `vapi_connected` message
+5. **Audio Streaming**: Bidirectional PCM audio streaming begins
 
 ## Base Configuration
 
