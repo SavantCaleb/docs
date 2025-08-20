@@ -30,7 +30,7 @@ description: 'Establish real-time audio streaming connections'
     Immediately send your JWT token as a text message
   </Step>
   <Step title="Wait for Confirmation">
-    Server sends `savants_connected` when ready
+    Server sends `savant_voice_connected` when ready
   </Step>
   <Step title="Start Streaming">
     Begin bidirectional audio streaming
@@ -44,7 +44,7 @@ description: 'Establish real-time audio streaming connections'
 **Connection Confirmed:**
 ```json
 {
-  "type": "savants_connected",
+  "type": "savant_voice_connected",
   "message": "Connection established"
 }
 ```
