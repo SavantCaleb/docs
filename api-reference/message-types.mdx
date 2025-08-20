@@ -77,7 +77,7 @@ The WebSocket API uses two types of messages:
     **Schema:**
     ```json
     {
-      "type": "savants_connected",
+      "type": "savant_voice_connected",
       "message": "string",
       "timestamp": "ISO8601 string",
       "sessionId": "string (optional)"
@@ -87,7 +87,7 @@ The WebSocket API uses two types of messages:
     **Example:**
     ```json
     {
-      "type": "savants_connected",
+      "type": "savant_voice_connected",
       "message": "Voice API connection established successfully",
       "timestamp": "2024-01-15T10:30:00.123Z",
       "sessionId": "sess_abc123def456"
@@ -268,7 +268,7 @@ sequenceDiagram
     C->>S: WebSocket Connect
     S->>C: Connection Open
     C->>S: JWT Token (Text)
-    S->>C: {"type": "savants_connected"} (JSON)
+    S->>C: {"type": "savant_voice_connected"} (JSON)
     
     loop Audio Conversation
         C->>S: Audio Data (Binary)
