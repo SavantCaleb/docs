@@ -98,7 +98,7 @@ class VoiceService {
   void _handleMessage(dynamic message) {
     if (message is String) {
       final data = jsonDecode(message);
-      if (data['type'] == 'savants_connected') {
+      if (data['type'] == 'savant_voice_connected') {
         _startAudioStreaming();
       } else if (data['type'] == 'error') {
         _updateState(VoiceStatus.error, "Error: ${data['error']['message']}");
