@@ -20,7 +20,7 @@ Flutter App  ←  [JWT Token Response]  ←  Auth Server
 **Step 2: Real-time Communication**
 ```
 Flutter App  →  [WebSocket Connect + JWT]  →  WebSocket Server
-Flutter App  ←  [savants_connected confirmation]  ←  WebSocket Server
+Flutter App  ←  [savant_voice_connected confirmation]  ←  WebSocket Server
 Flutter App  ↔  [Bidirectional Audio Stream]  ↔  WebSocket Server
 ```
 
@@ -29,7 +29,7 @@ Flutter App  ↔  [Bidirectional Audio Stream]  ↔  WebSocket Server
 1. **Authentication Request**: Flutter app sends API key and device ID to get JWT token
 2. **Token Response**: Server returns short-lived JWT token (1 minute expiry)
 3. **WebSocket Connection**: App connects to WebSocket endpoint with JWT token
-4. **Connection Confirmation**: Server confirms with `savants_connected` message
+4. **Connection Confirmation**: Server confirms with `savant_voice_connected` message
 5. **Audio Streaming**: Bidirectional PCM audio streaming begins
 
 ## Base Configuration
